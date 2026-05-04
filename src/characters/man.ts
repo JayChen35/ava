@@ -80,14 +80,14 @@ const MAN_LAUNDRY_2: PixelArt = [
 const MAN_WALK_1: PixelArt = [
   '...........',
   '...HHHHH...',
-  '..HHsHHH...',
-  '..HSSSSH...',
-  '..sSESEs...',
-  '..SSsSSS...',
-  '..SsoSsS...',
-  '...sSSs....',
-  '..wWWWWw...',
-  '..WWWWWW...',
+  '..HHsHHH.LL',
+  '..HSSSSH.FF',
+  '..sSESEs.FF',
+  '..SSsSSS.LL',
+  '..SsoSsS.S.',
+  '...sSSs.SS.',
+  '..wWWWWw.W.',
+  '..WWWWWWWW.',
   '..WWWWWW...',
   '..wWWWWw...',
   '..pPPPPp...',
@@ -100,14 +100,14 @@ const MAN_WALK_1: PixelArt = [
 const MAN_WALK_2: PixelArt = [
   '...........',
   '...HHHHH...',
-  '..HHsHHH...',
-  '..HSSSSH...',
-  '..sSESEs...',
-  '..SSsSSS...',
-  '..SsoSsS...',
-  '...sSSs....',
-  '..wWWWWw...',
-  '..WWWWWW...',
+  '..HHsHHH.LL',
+  '..HSSSSH.FF',
+  '..sSESEs.FF',
+  '..SSsSSS.LL',
+  '..SsoSsS.S.',
+  '...sSSs.SS.',
+  '..wWWWWw.W.',
+  '..WWWWWWWW.',
   '..WWWWWW...',
   '..wWWWWw...',
   '..pPPPPp...',
@@ -118,23 +118,32 @@ const MAN_WALK_2: PixelArt = [
 ];
 // follow: holds bouquet up in right hand, looking forward
 const MAN_FOLLOW: PixelArt = [
-  '........FFL',
-  '...HHHHH.FF',
-  '..HHsHHH.LF',
-  '..HSSSSH.FF',
-  '..sSESEs.F.',
-  '..SSsSSS.F.',
-  '..SsoSsS.S.',
-  '...sSSs.SS.',
-  '..wWWWWw.W.',
-  '..WWWWWWWW.',
-  '..WWWWWW...',
-  '..wWWWWw...',
-  '..pPPPPp...',
-  '..pPPPPp...',
-  '..pPPPPp...',
-  '..BBBBBB...',
+  '.......F.FL',
+  '..HHHHH.FFF',
+  '.HHsHHH.LFL',
+  '.HSSSSH.FFF',
+  '.sSESEs.FL.',
+  '.SSsSSS.F..',
+  '.SsoSsS.S..',
+  '..sSSs.SS..',
+  '.wWWWWw.W..',
+  '.WWWWWWWW..',
+  '.WWWWWW....',
+  '.wWWWWw....',
+  '.pPPPPp....',
+  '.pPPPPp....',
+  '.pPPPPp....',
+  '.BBBBBB....',
   '...........',
+];
+
+// Heart for the trail
+const HEART: PixelArt = [
+  '.F.F.',
+  'FFFFF',
+  'FFFFF',
+  '.FFF.',
+  '..F..',
 ];
 
 // Speech bubble with an exclamation mark
@@ -154,6 +163,13 @@ const BUBBLE: PixelArt = [
 // ─────────────────────────────────────────────────────────────────────────────
 type State = 'IDLE_LAUNDRY' | 'TRANSITION' | 'WALKING' | 'FOLLOWING';
 
+interface HeartInstance {
+  sprite: Sprite;
+  age: number;
+  vx: number;
+  vy: number;
+}
+
 interface ManState {
   state: State;
   // Animation
@@ -169,6 +185,9 @@ interface ManState {
   sinceReplanMs: number;
   sinceStartMs: number;
   bubbleShownAt: number | null;
+  // Trail
+  hearts: HeartInstance[];
+  sinceHeartSpawn: number;
 }
 
 export function buildMan(layers: Layers, renderer: Renderer, graph: Graph): ManRefs {
@@ -178,6 +197,7 @@ export function buildMan(layers: Layers, renderer: Renderer, graph: Graph): ManR
   const t_walk2 = pixelsToTexture(MAN_WALK_2, PALETTE, renderer);
   const t_follow = pixelsToTexture(MAN_FOLLOW, PALETTE, renderer);
   const t_bubble = pixelsToTexture(BUBBLE, PALETTE, renderer);
+  const t_heart = pixelsToTexture(HEART, PALETTE, renderer);
 
   const sprite = new Sprite(t_laundry1);
   // Anchor at bottom-center so we can position by feet.
@@ -216,6 +236,8 @@ export function buildMan(layers: Layers, renderer: Renderer, graph: Graph): ManR
     sinceReplanMs: 0,
     sinceStartMs: 0,
     bubbleShownAt: null,
+    hearts: [],
+    sinceHeartSpawn: 0,
   };
 
   function setSprite(tex: Texture) {
@@ -267,6 +289,43 @@ export function buildMan(layers: Layers, renderer: Renderer, graph: Graph): ManR
         laundry.rect(x, y + 1, c.w, c.h).fill(c.color);
         // a slightly darker bottom hem
         laundry.rect(x, y + c.h, c.w, 1).fill({ color: 0x000000, alpha: 0.18 });
+      }
+
+      // ── Trail logic ──
+      const isMoving = ms.state === 'WALKING';
+      if (isMoving) {
+        ms.sinceHeartSpawn += dt;
+        if (ms.sinceHeartSpawn > 0.4) {
+          ms.sinceHeartSpawn = 0;
+          const hSprite = new Sprite(t_heart);
+          hSprite.anchor.set(0.5);
+          hSprite.x = ms.x + (Math.random() - 0.5) * 8;
+          hSprite.y = ms.y - 12 + (Math.random() - 0.5) * 8;
+          hSprite.scale.set(0.6 + Math.random() * 0.4);
+          layers.islandFront.addChild(hSprite);
+          ms.hearts.push({
+            sprite: hSprite,
+            age: 0,
+            vx: (Math.random() - 0.5) * 10,
+            vy: -15 - Math.random() * 15,
+          });
+        }
+      }
+      for (let i = ms.hearts.length - 1; i >= 0; i--) {
+        const h = ms.hearts[i];
+        h.age += dt;
+        h.sprite.x += h.vx * dt;
+        h.sprite.y += h.vy * dt;
+        h.vy += 10 * dt; // slight gravity or drift
+        const life = 2.0; // seconds
+        const alpha = Math.max(0, 1 - h.age / life);
+        h.sprite.alpha = alpha;
+        h.sprite.scale.set(h.sprite.scale.x * 1.005); // slightly grow as it evaporates
+        if (h.age >= life) {
+          layers.islandFront.removeChild(h.sprite);
+          h.sprite.destroy();
+          ms.hearts.splice(i, 1);
+        }
       }
 
       // ── State machine ──

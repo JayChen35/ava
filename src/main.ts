@@ -36,17 +36,33 @@ function buildLayers(stage: Container): Layers {
 // any window size; the GPU's nearest-neighbor scaling still keeps pixel art
 // crisp because the canvas backing buffer stays at VIEW_W × VIEW_H.
 function fitToWindow(canvas: HTMLCanvasElement, app: Application) {
-  const margin = 6; // small breathing room so the panel isn't edge-glued
-  const w = window.innerWidth - margin * 2;
-  const h = window.innerHeight - margin * 2;
-  const scale = Math.min(w / VIEW_W, h / VIEW_H);
+  const minMargin = 6;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // Calculate the scale that would fit within the window with at least minMargin.
+  let scale = Math.min((w - minMargin * 2) / VIEW_W, (h - minMargin * 2) / VIEW_H);
+
+  // To make the horizontal (top/bottom) bars the same width as the vertical (left/right)
+  // bars, we need (w - VIEW_W * scale) / 2 = (h - VIEW_H * scale) / 2.
+  // Solving for scale: scale = (w - h) / (VIEW_W - VIEW_H).
+  // If this scale is smaller than our fitting scale, we use it to achieve uniform borders.
+  if (VIEW_W !== VIEW_H) {
+    const balanceScale = (w - h) / (VIEW_W - VIEW_H);
+    if (balanceScale > 0 && balanceScale < scale) {
+      scale = balanceScale;
+    }
+  }
+
   const cssW = Math.floor(VIEW_W * scale);
   const cssH = Math.floor(VIEW_H * scale);
+
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
   canvas.style.position = 'absolute';
-  canvas.style.left = `${Math.round((window.innerWidth - cssW) / 2)}px`;
-  canvas.style.top = `${Math.round((window.innerHeight - cssH) / 2)}px`;
+  canvas.style.left = `${Math.round((w - cssW) / 2)}px`;
+  canvas.style.top = `${Math.round((h - cssH) / 2)}px`;
+
   // Internal resolution stays at VIEW_W × VIEW_H.
   app.renderer.resize(VIEW_W, VIEW_H);
 }
